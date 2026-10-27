@@ -1,0 +1,160 @@
+name: Gerar APK
+on:
+  push:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Montar projeto Android
+        run: |
+          mkdir -p build-app && cd build-app
+          mkdir -p "$(dirname 'settings.gradle')"
+          cat > 'settings.gradle' <<'EOF_ARQ'
+          pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
+          dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }
+          rootProject.name = "PlacarBJJ"
+          include ":app"
+          EOF_ARQ
+          mkdir -p "$(dirname 'build.gradle')"
+          cat > 'build.gradle' <<'EOF_ARQ'
+          plugins { id 'com.android.application' version '8.7.3' apply false }
+          EOF_ARQ
+          mkdir -p "$(dirname 'gradle.properties')"
+          cat > 'gradle.properties' <<'EOF_ARQ'
+          org.gradle.jvmargs=-Xmx2048m
+          android.useAndroidX=true
+          EOF_ARQ
+          mkdir -p "$(dirname 'app/build.gradle')"
+          cat > 'app/build.gradle' <<'EOF_ARQ'
+          plugins { id 'com.android.application' }
+          android {
+              namespace 'br.com.placarbjj'
+              compileSdk 35
+              defaultConfig {
+                  applicationId 'br.com.placarbjj'
+                  minSdk 26
+                  targetSdk 35
+                  versionCode 1
+                  versionName '1.0'
+              }
+              buildTypes { release { minifyEnabled false } }
+              compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+          }
+          EOF_ARQ
+          mkdir -p "$(dirname 'app/src/main/AndroidManifest.xml')"
+          cat > 'app/src/main/AndroidManifest.xml' <<'EOF_ARQ'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.INTERNET" />
+              <application android:label="Placar BJJ" android:icon="@mipmap/ic_launcher"
+                  android:theme="@style/Theme.Placar" android:allowBackup="true">
+                  <activity android:name=".MainActivity" android:exported="true"
+                      android:screenOrientation="sensorLandscape"
+                      android:configChanges="orientation|screenSize|keyboardHidden|keyboard|screenLayout|smallestScreenSize">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          EOF_ARQ
+          mkdir -p "$(dirname 'app/src/main/res/values/styles.xml')"
+          cat > 'app/src/main/res/values/styles.xml' <<'EOF_ARQ'
+          <resources>
+              <style name="Theme.Placar" parent="android:Theme.Material.NoActionBar.Fullscreen">
+                  <item name="android:windowBackground">@color/bg</item>
+                  <item name="android:statusBarColor">@color/bg</item>
+                  <item name="android:navigationBarColor">@color/bg</item>
+              </style>
+              <color name="bg">#0B0D10</color>
+          </resources>
+          EOF_ARQ
+          mkdir -p "$(dirname 'app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml')"
+          cat > 'app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml' <<'EOF_ARQ'
+          <?xml version="1.0" encoding="utf-8"?>
+          <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+              <background android:drawable="@color/bg" />
+              <foreground android:drawable="@drawable/ic_fg" />
+          </adaptive-icon>
+          EOF_ARQ
+          mkdir -p "$(dirname 'app/src/main/res/drawable/ic_fg.xml')"
+          cat > 'app/src/main/res/drawable/ic_fg.xml' <<'EOF_ARQ'
+          <?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+              <path android:fillColor="#16A34A" android:pathData="M30,36h48v16h-48z" />
+              <path android:fillColor="#FACC15" android:pathData="M30,56h48v16h-48z" />
+              <path android:fillColor="#FFFFFF" android:pathData="M62,39h12v10h-12zM62,59h12v10h-12z" />
+          </vector>
+          EOF_ARQ
+          mkdir -p "$(dirname 'app/src/main/java/br/com/placarbjj/MainActivity.java')"
+          cat > 'app/src/main/java/br/com/placarbjj/MainActivity.java' <<'EOF_ARQ'
+          package br.com.placarbjj;
+
+          import android.app.Activity;
+          import android.os.Bundle;
+          import android.view.View;
+          import android.view.WindowManager;
+          import android.webkit.WebSettings;
+          import android.webkit.WebView;
+          import android.webkit.WebViewClient;
+
+          public class MainActivity extends Activity {
+              private WebView web;
+
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                  web = new WebView(this);
+                  web.setBackgroundColor(0xFF0B0D10);
+                  WebSettings s = web.getSettings();
+                  s.setJavaScriptEnabled(true);
+                  s.setDomStorageEnabled(true);
+                  s.setMediaPlaybackRequiresUserGesture(false);
+                  s.setUserAgentString(s.getUserAgentString() + " PlacarBJJApp");
+                  web.setWebViewClient(new WebViewClient());
+                  setContentView(web);
+                  web.loadUrl("file:///android_asset/index.html");
+                  hideBars();
+              }
+
+              @Override
+              public void onWindowFocusChanged(boolean hasFocus) {
+                  super.onWindowFocusChanged(hasFocus);
+                  if (hasFocus) hideBars();
+              }
+
+              private void hideBars() {
+                  getWindow().getDecorView().setSystemUiVisibility(
+                      View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_FULLSCREEN
+                      | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                      | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN);
+              }
+
+              @Override
+              protected void onPause() { web.evaluateJavascript("window.dispatchEvent(new Event('pagehide'))", null); super.onPause(); }
+
+              @Override
+              public void onBackPressed() { /* evita sair do placar sem querer durante a luta */ }
+          }
+          EOF_ARQ
+          mkdir -p app/src/main/assets
+          cp ../index.html app/src/main/assets/index.html
+      - name: Compilar APK
+        working-directory: build-app
+        run: gradle assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PlacarBJJ-apk
+          path: build-app/app/build/outputs/apk/debug/app-debug.apk
