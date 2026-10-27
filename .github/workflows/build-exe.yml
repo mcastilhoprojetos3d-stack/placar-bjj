@@ -1,0 +1,66 @@
+name: Gerar EXE Windows
+on:
+  push:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Montar app de computador
+        run: |
+          mkdir -p desktop && cd desktop
+          cp ../index.html index.html
+          cat > package.json <<'EOF_ARQ'
+          {
+            "name": "placar-bjj",
+            "version": "1.0.0",
+            "description": "Placar de Jiu-Jitsu",
+            "author": "Marcelo Castilho",
+            "main": "main.js",
+            "build": {
+              "appId": "br.com.placarbjj",
+              "productName": "Placar BJJ",
+              "files": ["main.js", "index.html"],
+              "win": { "target": "portable" },
+              "portable": { "artifactName": "PlacarBJJ.exe" }
+            }
+          }
+          EOF_ARQ
+          cat > main.js <<'EOF_ARQ'
+          const { app, BrowserWindow, Menu } = require('electron');
+          function novaJanela() {
+            const w = new BrowserWindow({
+              width: 1280, height: 800, backgroundColor: '#0b0d10',
+              autoHideMenuBar: true, title: 'Placar BJJ'
+            });
+            w.loadFile('index.html');
+          }
+          app.whenReady().then(() => {
+            Menu.setApplicationMenu(Menu.buildFromTemplate([{
+              label: 'Placar',
+              submenu: [
+                { label: 'Nova janela (Telão)', accelerator: 'CmdOrCtrl+N', click: novaJanela },
+                { role: 'togglefullscreen', label: 'Tela cheia', accelerator: 'F11' },
+                { type: 'separator' },
+                { role: 'quit', label: 'Sair' }
+              ]
+            }]));
+            novaJanela();
+          });
+          app.on('window-all-closed', () => app.quit());
+          EOF_ARQ
+          npm install --save-dev electron@33.2.1 electron-builder@25.1.8
+      - name: Compilar EXE
+        working-directory: desktop
+        run: npx electron-builder --win portable --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PlacarBJJ-windows
+          path: desktop/dist/PlacarBJJ.exe
